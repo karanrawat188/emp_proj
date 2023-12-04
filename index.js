@@ -11,8 +11,6 @@ require('dotenv').config()
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authRoutes);
-app.use(deleteRoutes);
-
 app.use('/update',updateRoutes);
 app.use('/filter',queryParamsRoutes);
 app.use('/delete',deleteRoutes);
