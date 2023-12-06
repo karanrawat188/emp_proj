@@ -24,8 +24,10 @@ async function deleteEmployee(req, res) {
         msg: errorMessages.ID_NOT_ENTERED,
       });
     }
+   
     console.log(toBeDeleted); // ye check karna hai kii array return karna hai ya object !!!
     const toBeDeletedRole = toBeDeleted[0].role;
+    console.log(userRole)
     if (
       toBeDeletedRole === "employee" &&
       (userRole === "manager" || userRole === "admin")
@@ -35,7 +37,7 @@ async function deleteEmployee(req, res) {
 
       await UserService.storeLog(toBeDeleted[0], arr);
       return res.status(201).json({
-        msg: `User successfully deleted of employee id ${toBeDeletedRole}`,
+        msg: `User successfully deleted of employee id ${toBeDeleted[0]}`,
       });
     } else {
       return res.status(401).json({
@@ -55,11 +57,15 @@ async function deletedLogs(req, res) {
 
 async function deleteManager(req, res) {
   try {
-    if (
+    if ( 
+       // fetch id , old Dept , new Dept from req.body
+
       !req.body.id ||
       typeof req.body.id !== "number" ||
       !req.body.newAssignedDepartment ||
-      typeof req.body.newAssignedDepartment !== "string"
+      typeof req.body.newAssignedDepartment !== "string"||
+      !req.body.delDept||
+      typeof req.body.delDept !=="string"
     ) {
       return res.status(404).json({
         validationError:"INVALID_INPUT",
@@ -68,27 +74,15 @@ async function deleteManager(req, res) {
     }
 
     const isAdmin = req.user.role;
-    const eid = req.body.id; // iss id ko delete karna hai 
-    const toBeDeleted = await UserService.getUserByID(eid); // data le lia
-    if(toBeDeleted.length===0){
+    const managerData = await UserService.getManager(req.body.id,req.body.delDept);
+    if(managerData.length === 0){
       return res.status(404).json({
         validationError:"INVALID_INPUT",
         msg:errorMessages.INVALID_INPUT
       })
-    }
-    const toBeDel=toBeDeleted[0];
-    console.log(toBeDel)
-    const toBeDelDept=toBeDel.department;
-
-    console.log(toBeDeleted);
-    if (toBeDeleted.length === 0) {
-      return res.status(404).json({
-        validationError: "DOES_NOT_EXIST",
-        msg: errorMessages.DOES_NOT_EXIST,
-      });
-    }
-    const toBeDeletedRole = toBeDeleted[0].role;  // role manager hona chaeye
-    if (isAdmin === "admin" && toBeDeletedRole === "manager") {
+    }     
+    console.log(managerData);
+    if (isAdmin === "admin"){
       const newDepartment = req.body.newAssignedDepartment;
       if (
         newDepartment !== "IT" &&
@@ -107,7 +101,7 @@ async function deleteManager(req, res) {
       }
 
       const newManagerID =await UserService.getManagerIdFromDept(newDepartment); // new department should exists and be assigned
-      if(!newManagerID){
+      if(newManagerID.length===0){
         return res.status(404).json({
             validationError:"DEPARTMENT_NOT_ASSIGNED",
             msg:errorMessages.DEPARTMENT_NOT_ASSIGNED
@@ -115,16 +109,14 @@ async function deleteManager(req, res) {
       }
       const arr = [isAdmin, req.user.email];
       await UserService.deleteManagerByID(
-        eid,
-        newManagerID.manager_id,
+        newManagerID[0].employee_id,
         newDepartment,
-        toBeDel.email,
-        toBeDelDept,
+        managerData[0].employee_id,
       );
       
-      await UserService.storeLog(toBeDeleted[0],arr);
+      await UserService.storeLog(managerData[0],arr);
       return res.status(201).json({
-        msg: `User successfully deleted of employee id ${toBeDeleted[0]}`,
+        msg: `User successfully deleted of employee id ${managerData[0]}`,
       });
     } else {
       return res.status(401).json({

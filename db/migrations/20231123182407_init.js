@@ -4,12 +4,6 @@
  */
 exports.up = function (knex) {
   return knex.schema
-  .createTable("manager", (table) => {
-   // table.increments("manager_id").primary();
-   table.integer('manager_id').unsigned().notNullable().primary();
-    table.string("email").notNullable().unique();
-    table.enum("department",["IT","Sales","Marketing","Finance","Accounts","HR","Others","Administrator"]).notNullable();
-  })
     .createTable("employee", (table) => {
       table.increments("employee_id").primary();
       table.string("first_name").notNullable();
@@ -26,8 +20,6 @@ exports.up = function (knex) {
       table.string("password").notNullable();
       table.integer("salary").notNullable();
       table.specificType('location', 'geometry'); // 4326 srid hai
-      // Foreign key reference to manager table
-      table.foreign("manager_id").references("manager.manager_id").onDelete('SET NULL');
     }).createTable("log",(table)=>{
       table.jsonb("deleted_user_info");  
       table.specificType("departed_by", "TEXT[]");  
@@ -39,5 +31,5 @@ exports.up = function (knex) {
  */
 
 exports.down = function (knex) {
-  return knex.schema.dropTableIfExists("employee").dropTableIfExists("manager");
+  return knex.schema.dropTableIfExists("employee");
 };

@@ -60,21 +60,21 @@ class UserDAO {
   async getUserByEmail(email) {
     try {
       const user = await db("employee").where({ email: email }).first();
-      const {password,...withoutpassword} = user;
-      console.log(withoutpassword)
+      const { password, ...withoutpassword } = user;
+      console.log(withoutpassword);
       return withoutpassword;
     } catch (err) {
       throw new Error("Error occurred" + err.message);
     }
   }
-  async isEmailUniquePost(email){
-    try{
-      const user = await db("employee").where({email:email});
-      return user
-    }catch(err){
+  async isEmailUniquePost(email) {
+    try {
+      const user = await db("employee").where({ email: email });
+      return user;
+    } catch (err) {
       throw new Error("Error occurred" + err.message);
     }
-  } 
+  }
   async isEmailUnique(email) {
     try {
       const existingUser = await db("employee").where("email", email).first();
@@ -83,12 +83,12 @@ class UserDAO {
       throw new Error("Error occurred" + err.message);
     }
   }
-  async fetchpassword(email){
-    try{
+  async fetchpassword(email) {
+    try {
       const hp = await db("employee").where("email", email).first();
-      const {password,...withoutpassword} = hp;
+      const { password, ...withoutpassword } = hp;
       return password;
-    }catch(err){
+    } catch (err) {
       throw new Error("Error occurred" + err.message);
     }
   }
@@ -133,11 +133,6 @@ class UserDAO {
       throw new Error("Error occurred" + err.message);
     }
   }
-  generateRandomFiveDigitNumber() {
-    const min = 10000; // Smallest 5-digit number
-    const max = 99999; // Largest 5-digit number
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-  }
 
   async getAllUsers() {
     const users = await db("employee").select("*");
@@ -150,9 +145,9 @@ class UserDAO {
 
     return usersWithoutPasswords;
   }
-  async fetchUserByIDParam(id){
-    const query  = await db("employee").where("employee_id",id).first();
-    const {password,...withoutpassword} = query;
+  async fetchUserByIDParam(id) {
+    const query = await db("employee").where("employee_id", id).first();
+    const { password, ...withoutpassword } = query;
     return withoutpassword;
   }
 
@@ -167,27 +162,27 @@ class UserDAO {
       throw new Error(`Error fetching manager name: ${error.message}`);
     }
   }
-  async updateFirstName(newFirstName, email) {
+  async updateFirstName(newFirstName, id) {
     const result = await db("employee")
-      .where("email", email)
+      .where("employee_id", id)
       .update({ first_name: newFirstName });
     return result;
   }
-  async updateLastName(newLastName, email) {
+  async updateLastName(newLastName, id) {
     const result = await db("employee")
-      .where("email", email)
+      .where("employee_id",id)
       .update({ last_name: newLastName });
     return result;
   }
-  async updateAddress(newAddress, email) {
+  async updateAddress(newAddress, id) {
     const result = await db("employee")
-      .where("email", email)
-      .update({ address: newAddress });
+      .where("employee_id", id)
+      .update({ address: newAddress});
     return result;
   }
-  async updatePhone(newPhone, email) {
+  async updatePhone(newPhone, id) {
     const result = await db("employee")
-      .where("email", email)
+      .where("employee_id", id)
       .update({ phone: newPhone });
     return result;
   }
@@ -240,7 +235,7 @@ class UserDAO {
           "email",
           "role"
         )
-        .where('employee_id',id);
+        .where("employee_id", id);
       return query;
     } catch (err) {
       throw new Error("error occurred " + err.message);
@@ -266,57 +261,103 @@ class UserDAO {
     }
   }
 
-  
   async deleteManagerByIDTransaction(
-    oldMEID,
     newMID,
     newDepartment,
-    delEmail,
-    delDept,
+    oldMID,
   ) {
     return db.transaction(async (trx) => {
       try {
         await db("employee")
           .transacting(trx)
-          .where("employee_id", oldMEID).del()
-
-        await db("manager")
-        .transacting(trx)
-        .where("email",delEmail).del()
-
-        await db("employee")
-          .transacting(trx)
-          .where("department", delDept)
-          .update({
-            manager_id:newMID,
-            department:newDepartment,
-          })
+          .where('employee_id','=',oldMID)
+          .del()
+        await db("employee").transacting(trx).where('manager_id',oldMID).update({
+          department:newDepartment,
+          manager_id:newMID
+        });
       } catch (err) {
         await trx.rollback(err);
         throw err;
       }
     });
   }
-
-
-
-  async getManagerIdFromDept(departmemnt) {
+async getUsersWithFilter(userFilter){
+  return db('employee')
+  .where((builder) => {
+    Object.entries(userFilter).forEach(([field, filter]) => {
+      switch (filter.operator) {
+        case 'eq':
+          builder.where(field, 'ilike', `${filter.value}`);
+          break;
+        case 'gt':
+          builder.where(field, '>', filter.value);
+          break;
+        case 'sw':
+          builder.where(field, 'ilike', `${filter.value}%`);
+          break;
+      }
+    });
+  })
+  .select('employee_id', 'gender', 'salary', 'department');
+}
+  async getManagerIdFromDept(department) {
     try {
-      const manID = await db("manager")
-        .select("manager_id")
-        .where("department", departmemnt)
-        .first();
+      const manID = await db("employee")
+        .select("employee_id")
+        .where("department", department)
+        .where("role","=","manager");
+
       return manID;
     } catch (err) {
       throw new Error("error occurred " + err.message);
     }
   }
-  async getDeletedLogs(){
-    try{
-      const data = await db("log").select('*');
+  async getDeletedLogs() {
+    try {
+      const data = await db("log").select("*");
       return data;
-    }catch(err){
+    } catch (err) {
       throw new Error("error occurred " + err.message);
+    }
+  }
+  async getAdmin(department) {
+    try {
+      const data = await db("employee")
+        .where("department", department)
+        .whereNull("manager_id");
+      return data;
+    } catch (err) {
+      throw new Error("error occurred " + err.message);
+    }
+  }
+  async getManager(id, department) {
+    try {
+      const data = await db("employee")
+        .where("employee_id", id)
+        .where("department", department)
+        .where("role", "=", "manager");
+      return data;
+    } catch (err) {
+      throw new Error("error occurred " + err.message);
+    }
+  }
+  async getManagerFromDept(department) {
+    try {
+      const data = await db("employee")
+        .where("department", department)
+        .whereNull("manager_id");
+      return data;
+    } catch (err) {
+      throw new Error("error occurred" + err.message);
+    }
+  }
+  async getUserDept(department) {
+    try {
+      const data = await db("employee").where({ department: department });
+      return data;
+    } catch (err) {
+      throw new Error("error occured" + err.message);
     }
   }
 }

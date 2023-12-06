@@ -1,254 +1,117 @@
 const fs = require("fs");
 const path = require("path");
-const UserService = require("../service/user");
-const { createToken } = require("./jwtAuth");
+// const UserService = require("../service/user");
+// const { createToken } = require("./jwtAuth");
 const errorMessages = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../errors.json"), "utf-8")
 );
-const { performValidation } = require("../validation/validation");
-const maxAge = 3 * 24 * 60 * 60;
-async function updateOrInsertEmployee(req, res) {
+
+const db = require("../db/db");
+const UserService = require("../service/user");
+const { performEmployeeValidation } = require("../validation/validation");
+
+async function bulkUpdateOrInsertEmployees(req, res) {
   try {
-    const id = req.body.id;
-    if (!id) {
-      const validationArr = performValidation(req.body);
+    const userloggedInRole = req.user.role;
+    if (userloggedInRole !== "admin") {
+      return res.status(401).json({
+        validationError: "UNAUTHORIZED",
+        msg: errorMessages.UNAUTHORIZED,
+      });
+    }
+    const employeeDataArray = req.body; // Assuming an array of employee data
+
+    // Validate input data for each employee
+    const validationErrors = [];
+    for (const employeeData of employeeDataArray) {
+      const validationArr = await performEmployeeValidation(employeeData);
       if (validationArr.length > 0) {
-        return res.status(400).json({
-          err: "upsert failure",
-          msg: validationArr,
+        validationErrors.push({
+          employeeData,
+          errors: validationArr,
         });
       }
-      const firstName = req.body.firstName;
-      const lastName = req.body.lastName;
-      const dob = req.body.dob;
-      const gender = req.body.gender;
-      const email = req.body.email;
-      const department = req.body.department;
-      const manager = req.body.manager;
-      const address = req.body.address;
-      const password = req.body.password;
-      const role = req.body.role;
-      const phone = req.body.phone;
-      const salary = req.body.salary;
-      const latitude = req.body.latitude;
-      const longitude = req.body.longitude;
+    }
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        err: "Bulk upsert failure",
+        msg: validationErrors,
+      });
+    }
 
-      if (role === "manager" || role === "admin") {
-        return res.status(400).json({
-          validationError: "UNAUTHORIZED",
-          msg: errorMessages.UNAUTHORIZED,
-        });
+    await db.transaction(async (trx) => {
+      const results = [];
+      for (const employeeData of employeeDataArray) {
+        if ("id" in employeeData) {
+          if ("firstName" in employeeData) {
+            await UserService.updateFirstName(employeeData.firstName, employeeData.id);
+          }
+          if ("lastName" in employeeData) {
+            await UserService.updateLastName(employeeData.lastName, employeeData.id);
+          }
+          if ("phone" in employeeData) {
+            await UserService.updatePhone(employeeData.phone, employeeData.id);
+          }
+          if ("address" in employeeData) {
+            await UserService.updateAddress(employeeData.address, employeeData.id);
+          }
+          results.push({
+            id:employeeData.id,
+            message: "Employee successfully processed!",
+          });
+        } 
+        else {
+          const firstName = employeeData.firstName;
+          const lastName = employeeData.lastName;
+          const dob = employeeData.dob;
+          const gender = employeeData.gender;
+          const email = employeeData.email;
+          const department = employeeData.department;
+          const manager = employeeData.manager;
+          const address = employeeData.address;
+          const password = employeeData.password;
+          const role = employeeData.role;
+          const phone = employeeData.phone;
+          const salary = employeeData.salary;
+          const latitude = employeeData.latitude;
+          const longitude = employeeData.longitude;
+          const location = `POINT(${longitude} ${latitude})`;
+          const id = await UserService.createUser(
+            firstName,
+            lastName,
+            dob,
+            gender,
+            email,
+            department,
+            manager,
+            address,
+            password,
+            role,
+            phone,
+            salary,
+            location
+          );
+          results.push({
+            id,
+            message: "Employee successfully processed!",
+          });
+        }
       }
-      if (!manager) {
-        return res.status(404).json({
-          validationError: "ENTER_MANAGER",
-          msg: errorMessages.ENTER_MANAGER,
-        });
-      }
-      const deptName = await UserService.getDeptCorrespondingManager(manager);
-      if (!deptName) {
-        return res.status(404).json({
-          validationError: "MANAGER_DOES_NOT_EXIST",
-          msg: errorMessages.MANAGER_DOES_NOT_EXIST,
-        });
-      }
-      if (
-        deptName.department !== department ||
-        deptName.department === "Administrator"
-      ) {
-        return res.status(400).json({
-          validationError: "INV_MANAGER_REQ",
-          msg: errorMessages.INV_MANAGER_REQ,
-        });
-      }
-      const isUserEmailUnique = await UserService.isEmailUnique(email);
-      if (isUserEmailUnique) {
-        return res.status(404).json({
-          validationError: "INVALID_EMAIL",
-          msg: errorMessages.INVALID_EMAIL,
-        });
-      }
-      const location = `POINT(${longitude} ${latitude})`;
-      const id = await UserService.createUser(
-        firstName,
-        lastName,
-        dob,
-        gender,
-        email,
-        department,
-        manager,
-        address,
-        password,
-        role,
-        phone,
-        salary,
-        location
-      );
-
-      const data = {
-        department: department,
-        email: email,
-        role: role,
-        id: id,
-      };
-      const token = createToken(data, maxAge);
-
+      await trx.commit();
       res.status(201).json({
-        msg: "user successfully created!",
-        jwttoken: token,
-        id,
+        msg: "Bulk upsert successfully completed!",
+        results,
       });
-    }
-    //updation
-    else {
-      if (id !== req.user.id) {
-        return res.status(401).json({
-          validationError: "UNAUTHORIZED",
-          msg: errorMessages.UNAUTHORIZED,
-        });
-      }
-
-      const getId = await UserService.getUserByID(id);
-      const email = getId[0].email;
-      if (
-        !("newFirstName" in req.body) &&
-        !("newLastName" in req.body) &&
-        !("newAddress" in req.body) &&
-        !("newPhone" in req.body)
-      ) {
-        return res.status(204).json({
-          validationError: "N",
-          msg: errorMessages.N,
-        });
-      }
-
-      const { newFirstName, newLastName, newPhone, newAddress } = req.body;
-      if (newFirstName) {
-        if (
-          typeof newFirstName === "string" &&
-          /^[a-zA-Z]+$/.test(newFirstName)
-        ) {
-          await UserService.updateFirstName(newFirstName, email);
-        } else {
-          return res.status(400).json({
-            validationError: "INVALID_FNAME",
-            err: errorMessages.INVALID_FNAME,
-          });
-        }
-      }
-      if (newLastName) {
-        if (
-          typeof newLastName === "string" &&
-          /^[a-zA-Z]+$/.test(newLastName)
-        ) {
-          await UserService.updateLastName(newLastName, email);
-        } else {
-          return res.status(400).json({
-            validationError: "INVALID_LNAME",
-            err: errorMessages.INVALID_LNAME,
-          });
-        }
-      }
-
-      if (newPhone) {
-        if (typeof newPhone === "number") {
-          await UserService.updatePhone(newPhone, email);
-        } else {
-          return res.status(400).json({
-            validationError: "INVALID_PNUMBER",
-            err: errorMessages.INVALID_PNUMBER,
-          });
-        }
-      }
-      if (newAddress) {
-        if (typeof newAddress === "string") {
-          await UserService.updateAddress(newAddress, email);
-        } else {
-          return res.status(400).json({
-            validationError: "INVALID_ADDRESS",
-            err: errorMessages.INVALID_ADDRESS,
-          });
-        }
-      }
-      return res.status(200).json({
-        msg: `Entries updated `,
-      });
-    }
-  } catch (err) {
-    return res.status(err.statusCode || 500).json({ error: err.message });
+    });
+  } catch (error) {
+    console.error("Error during bulk upsert:", error);
+    res.status(500).json({
+      err: "Internal Server Error",
+      msg: "An internal server error occurred.",
+    });
   }
 }
 
-async function updateEmployee(){
-
-      const getId = await UserService.getUserByID(req.user.id);
-      const email = getId[0].email;
-      if (
-        !("newFirstName" in req.body) &&
-        !("newLastName" in req.body) &&
-        !("newAddress" in req.body) &&
-        !("newPhone" in req.body)
-      ) {
-        return res.status(204).json({
-          validationError: "N",
-          msg: errorMessages.N,
-        });
-      }
-
-      const { newFirstName, newLastName, newPhone, newAddress } = req.body;
-      if (newFirstName) {
-        if (
-          typeof newFirstName === "string" &&
-          /^[a-zA-Z]+$/.test(newFirstName)
-        ) {
-          await UserService.updateFirstName(newFirstName, email);
-        } else {
-          return res.status(400).json({
-            validationError: "INVALID_FNAME",
-            err: errorMessages.INVALID_FNAME,
-          });
-        }
-      }
-      if (newLastName) {
-        if (
-          typeof newLastName === "string" &&
-          /^[a-zA-Z]+$/.test(newLastName)
-        ) {
-          await UserService.updateLastName(newLastName, email);
-        } else {
-          return res.status(400).json({
-            validationError: "INVALID_LNAME",
-            err: errorMessages.INVALID_LNAME,
-          });
-        }
-      }
-
-      if (newPhone) {
-        if (typeof newPhone === "number") {
-          await UserService.updatePhone(newPhone, email);
-        } else {
-          return res.status(400).json({
-            validationError: "INVALID_PNUMBER",
-            err: errorMessages.INVALID_PNUMBER,
-          });
-        }
-      }
-      if (newAddress) {
-        if (typeof newAddress === "string") {
-          await UserService.updateAddress(newAddress, email);
-        } else {
-          return res.status(400).json({
-            validationError: "INVALID_ADDRESS",
-            err: errorMessages.INVALID_ADDRESS,
-          });
-        }
-      }
-      return res.status(200).json({
-        msg: `Entries updated `,
-      });
-}
-
 module.exports = {
-  updateOrInsertEmployee,
-  updateEmployee,
+  bulkUpdateOrInsertEmployees,
 };

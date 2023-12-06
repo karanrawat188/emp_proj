@@ -28,7 +28,7 @@ class UserService {
       const passwordStrength = zxcvbn(password);
       if (passwordStrength.score < 2) {
         const error = new Error(errorMessages.WEAK_PASSWORD);
-        error.statusCode = 400; // Set the status code
+        error.statusCode = 400; 
         throw error;
       }
 
@@ -71,16 +71,16 @@ class UserService {
     try {
       const exists = await personDAO.isEmailUnique(email);
       return exists;
-      }catch (err) {
+    } catch (err) {
       throw new Error("error occurred " + err.message);
     }
   }
-  async isEmailUniquePost(email){
-    try{
+  async isEmailUniquePost(email) {
+    try {
       const exists = await personDAO.isEmailUniquePost(email);
       return exists;
-    }catch(err){
-      throw new Error('new error occurred'+ err.message)
+    } catch (err) {
+      throw new Error("new error occurred" + err.message);
     }
   }
   async bcryptCompare(password, Userpassword) {
@@ -94,8 +94,8 @@ class UserService {
   async isManagerUnique(email) {
     try {
       const isUnique = await personDAO.checkForManager(email);
-       return isUnique;
-      }catch (err) {
+      return isUnique;
+    } catch (err) {
       throw new Error("error occurred " + err.message);
     }
   }
@@ -104,16 +104,15 @@ class UserService {
     try {
       const doesExist = await personDAO.checkForDepartment(department);
       return doesExist;
-      }catch (err) {
+    } catch (err) {
       throw new Error("error occurred " + err.message);
     }
   }
   async isAdminUnique(adminDepartment) {
-    try{
+    try {
       const doesExist = await personDAO.checkForAdmin(adminDepartment);
       return doesExist;
-    }
-catch (err) {
+    } catch (err) {
       throw new Error("error occurred " + err.message);
     }
   }
@@ -122,7 +121,23 @@ catch (err) {
       const deptName = await personDAO.getDeptName(manager);
       return deptName;
     } catch (err) {
-     console.error('error occurred')
+      console.error("error occurred");
+    }
+  }
+  async getUserByDept(department) {
+    try {
+      const user = await personDAO.getUserDept(department);
+      return user;
+    } catch (err) {
+      console.log(err.message);
+    }
+  }
+  async getAdmin(department) {
+    try {
+      const user = await personDAO.getAdmin(department);
+      return user;
+    } catch (err) {
+      console.log(err.message);
     }
   }
   async getAllUsers() {
@@ -133,6 +148,19 @@ catch (err) {
     } catch (err) {
       throw new Error("error occurred " + err.message);
     }
+  }
+  async getManager(id,department){
+    try{
+      const users = await personDAO.getManager(id,department);
+      return users
+    }catch(err){
+      throw new Error("error occurred"+err.message);
+    }
+
+
+  }
+  async getManagerFromDept(department) {
+    const user = await personDAO.getManagerFromDept(department);
   }
   async getManagerName(managerId) {
     try {
@@ -147,13 +175,13 @@ catch (err) {
       throw new Error("error occurred " + err.message);
     }
   }
-  async updateFirstName(newFirstName, email) {
-    const fname = await personDAO.updateFirstName(newFirstName, email);
+  async updateFirstName(newFirstName,id) {
+    const fname = await personDAO.updateFirstName(newFirstName, id);
     //yaha par error handle ho sakta hai if newFname=Fname
     return fname;
   }
-  async updateLastName(newLastName, email) {
-    const lname = await personDAO.updateLastName(newLastName, email);
+  async updateLastName(newLastName, id) {
+    const lname = await personDAO.updateLastName(newLastName, id);
     return lname;
   }
   async updatePhone(newPhone, email) {
@@ -203,44 +231,79 @@ catch (err) {
       throw new Error("new error occurred " + err.message);
     }
   }
-  async deleteManagerByID(oldManagerEID, newMID, newAssignedDepartment,delEmail,delDept) {
+  async deleteManagerByID(
+    newMID,
+    newDepartment,
+    oldMID,
+  ) {
     try {
-      await personDAO.deleteManagerByIDTransaction(oldManagerEID,newMID,newAssignedDepartment,delEmail,delDept);
+      await personDAO.deleteManagerByIDTransaction(
+  
+        newMID,
+        newDepartment,
+        oldMID
+      );
     } catch (err) {
       throw new Error("new error occurred " + err.message);
     }
   }
-  async getManagerIdFromDept(department){
-    try{
+  async getManagerIdFromDept(department) {
+    try {
       //yaha se shuru karna hai/
       const manID = await personDAO.getManagerIdFromDept(department);
       return manID;
-    }catch(err){
-    throw new Error('new Erorr occurred'+err.message);
+    } catch (err) {
+      throw new Error("new Erorr occurred" + err.message);
     }
   }
-  async fetchpassword(email){
+  async getUsers(params){
     try{
-      const hp = await personDAO.fetchpassword(email);
-      return hp;
-    }catch(err){
-      throw new Error('new Erorr occurred'+err.message);
-    }
-  }
-  async fetchUserByIDParam(id){
-  try{
-    const user = await personDAO.fetchUserByIDParam(id);
-    return user;
-  }catch(err){
-    throw new Error('new error occurred'+err.message);
-  }
-  }
-  async getDeletedLogs(){
-    try{
-      const user = await personDAO.getDeletedLogs();
-      return user;
+    
+      const userFilter = {}; // Construct filter based on queryParams
+ 
+      if (params.gender) {
+        const [operator, value] = params.gender.split(':');
+        userFilter.gender = { operator, value };
+      }
+      if (params.salary) {
+        const [operator, value] = params.salary.split(':');
+        userFilter.salary = { operator, value };
+      }
+      if (params.department) {
+        const [operator, value] = params.department.toLowerCase().split(':');
+        userFilter.department = { operator, value };
+      }
+      console.log(userFilter);
+
+      return personDAO.getUsersWithFilter(userFilter);
+
+
     }catch(err){
       throw new Error('new error occurred'+err.message);
+    }
+  }
+  async fetchpassword(email) {
+    try {
+      const hp = await personDAO.fetchpassword(email);
+      return hp;
+    } catch (err) {
+      throw new Error("new Erorr occurred" + err.message);
+    }
+  }
+  async fetchUserByIDParam(id) {
+    try {
+      const user = await personDAO.fetchUserByIDParam(id);
+      return user;
+    } catch (err) {
+      throw new Error("new error occurred" + err.message);
+    }
+  }
+  async getDeletedLogs() {
+    try {
+      const user = await personDAO.getDeletedLogs();
+      return user;
+    } catch (err) {
+      throw new Error("new error occurred" + err.message);
     }
   }
 }

@@ -4,6 +4,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const { performValidation } = require("../validation/validation");
+const { error } = require("console");
 const errorMessages = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../errors.json"), "utf-8")
 );
@@ -41,7 +42,7 @@ async function signup_post(req, res) {
     latitude,
     longitude,
   });
-  
+
   const validationArr = performValidation(req.body);
   console.log(validationArr);
   if (validationArr.length > 0) {
@@ -50,94 +51,61 @@ async function signup_post(req, res) {
       msg: validationArr,
     });
   }
+
   const isUserEmailUnique = await UserService.isEmailUniquePost(email);
-  if (isUserEmailUnique.length>0) {
+  if (isUserEmailUnique.length > 0) {
     return res.status(404).json({
       validationError: "INVALID_EMAIL",
       msg: errorMessages.INVALID_EMAIL,
     });
   }
-  let managerId, adminId;
   try {
     if (role === "admin") {
       if (manager) {
-        return res.status(404).json({
+        return res.status(400).json({
           validationError: "MAN_ILLEGAL_IP",
           msg: errorMessages.MAN_ILLEGAL_IP,
         });
       }
-      const adminData = {
-        email,
-        department,
-      };
-      const adminUnique = await UserService.isAdminUnique(department);
-      if (adminUnique) {
-        return res.status(404).json({
-          validationError: "ADMIN_ALERADY_ASSIGNED",
-          msg: errorMessages.ADMIN_ALERADY_ASSIGNED,
+      const userExists = await UserService.getAdmin(department);
+      console.log(userExists);
+      if (userExists.length > 0) {
+        return res.status(400).json({
+          validationError: "ADMIN_ALREADY_ASSIGNED",
+          msg: errorMessages.ADMIN_ALREADY_ASSIGNED,
         });
       }
-      adminId = await UserService.createManager(adminData);
     }
+
     if (role === "manager") {
       if (manager) {
-        return res.status(404).json({
+        return res.status(400).json({
           validationError: "MAN_ILLEGAL_IP",
           msg: errorMessages.MAN_ILLEGAL_IP,
         });
       }
-      const managerUnique = await UserService.isManagerUnique(email);
-      const departmentUnique = await UserService.isDeptUnique(department);
-
-      if (departmentUnique) {
-        return res.status(404).json({
-          validationError: "DEPARTMENT_ALERADY_EXISTS",
+      const userExists = UserService.getManagerFromDept(department);
+      if (userExists.length > 0) {
+        return res.status(400).json({
+          validationError: "DEPARTMENT_ALREADY_EXISTS",
           msg: errorMessages.DEPARTMENT_ALREADY_EXISTS,
         });
       }
-      if (managerUnique) {
-        return res.status(404).json({
-          validationError: "MANAGER_ALERADY_EXISTS",
-          msg: errorMessages.MANAGER_ALREADY_EXISTS,
-        });
-      }
-      const managerData = {
-        email,
-        department,
-      };
-
-      managerId = await UserService.createManager(managerData);
     }
     if (role === "employee") {
       if (!manager) {
-        return res.status(404).json({
+        return res.status(400).json({
           validationError: "ENTER_MANAGER",
           msg: errorMessages.ENTER_MANAGER,
         });
       }
-      const deptName = await UserService.getDeptCorrespondingManager(manager);
-      if (!deptName) {
-        return res.status(404).json({
-          validationError: "MANAGER_DOES_NOT_EXIST",
-          msg: errorMessages.MANAGER_DOES_NOT_EXIST,
-        });
-      }
-      if (
-        deptName.department !== department ||
-        deptName.department === "Administrator"
-      ) {
+      const getManager = await UserService.getManager(manager, department);
+      if (getManager.length === 0) {
         return res.status(400).json({
-          validationError: "INV_MANAGER_REQ",
-          msg: errorMessages.INV_MANAGER_REQ,
+          validationError: "INVALID_MANAGER_ID",
+          msg: errorMessages.INVALID_MANAGER_ID
         });
       }
-      // const isUserEmailUnique = await UserService.isEmailUniquePost(email);
-      // if (isUserEmailUnique) {
-      //   return res.status(404).json({
-      //     validationError: "INVALID_EMAIL",
-      //     msg: errorMessages.INVALID_EMAIL,
-      //   });
-      // }
     }
     const location = `POINT(${longitude} ${latitude})`;
     const id = await UserService.createUser(
@@ -169,8 +137,6 @@ async function signup_post(req, res) {
     res.status(201).json({
       msg: "user successfully created!",
       jwttoken: token,
-      managerId,
-      adminId,
       id,
     });
   } catch (error) {
@@ -237,7 +203,6 @@ async function employeeDetails(req, res) {
   console.log(users);
   return res.status(200).json(users);
 }
-
 
 module.exports = {
   login_post,
