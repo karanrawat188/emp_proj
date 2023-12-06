@@ -54,10 +54,7 @@ class UserService {
       throw new Error("error occured " + err.message);
     }
   }
-  async createManager(managerDetails) {
-    const { email, department } = managerDetails;
-    return personDAO.createManager(email, department);
-  }
+
   async getUserByEmail(email) {
     try {
       const user = await personDAO.getUserByEmail(email);
@@ -160,7 +157,13 @@ class UserService {
 
   }
   async getManagerFromDept(department) {
-    const user = await personDAO.getManagerFromDept(department);
+    try{
+      const user = await personDAO.getManagerFromDept(department);
+      return user;
+    }catch(err){
+      throw new Error("error occurred " + err.message); 
+    }
+
   }
   async getManagerName(managerId) {
     try {
@@ -249,7 +252,6 @@ class UserService {
   }
   async getManagerIdFromDept(department) {
     try {
-      //yaha se shuru karna hai/
       const manID = await personDAO.getManagerIdFromDept(department);
       return manID;
     } catch (err) {
@@ -258,9 +260,9 @@ class UserService {
   }
   async getUsers(params){
     try{
-    
+
       const userFilter = {}; // Construct filter based on queryParams
- 
+      
       if (params.gender) {
         const [operator, value] = params.gender.split(':');
         userFilter.gender = { operator, value };
@@ -270,10 +272,17 @@ class UserService {
         userFilter.salary = { operator, value };
       }
       if (params.department) {
-        const [operator, value] = params.department.toLowerCase().split(':');
+        const [operator, value] = params.department.split(':');
         userFilter.department = { operator, value };
       }
-      console.log(userFilter);
+      if (params.employee_id) {
+        const [operator, value] = params.employee_id.split(':');
+        userFilter.employee_id = { operator, value };
+      }
+      if (params.first_name) {
+        const [operator, value] = params.first_name.split(':');
+        userFilter.first_name = { operator, value };
+      }
 
       return personDAO.getUsersWithFilter(userFilter);
 

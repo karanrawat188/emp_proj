@@ -9,7 +9,6 @@ async function queryRoutes(req, res) {
   try {
     const queryParam = req.query;
     const user = await UserService.getUsers(queryParam);
-    console.log(user)
     if (user.length > 0) {
       res.status(200).json(user);
     } else {
@@ -19,7 +18,9 @@ async function queryRoutes(req, res) {
       });
     }
   } catch (err) {
-    return res.status(500).json({ error: "Internal Server Error" });
+    return res.status(500).json({ 
+  error: "Internal Server Error",
+  msg:err.message });
   }
 }
 

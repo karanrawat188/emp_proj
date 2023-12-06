@@ -1,5 +1,6 @@
 const db = require("../db/db");
 const user = require("../service/user");
+const { DateTime } = require("luxon");
 
 class UserDAO {
   async createUser(
@@ -41,21 +42,6 @@ class UserDAO {
       throw new Error("Error occurred" + err.message);
     }
   }
-  async createManager(email, department) {
-    try {
-      const managerId = this.generateRandomFiveDigitNumber();
-      const [mid] = await db("manager")
-        .insert({
-          manager_id: managerId,
-          email: email,
-          department: department,
-        })
-        .returning("manager_id");
-      return mid;
-    } catch (err) {
-      throw new Error("Error occurred" + err.message);
-    }
-  }
 
   async getUserByEmail(email) {
     try {
@@ -88,47 +74,6 @@ class UserDAO {
       const hp = await db("employee").where("email", email).first();
       const { password, ...withoutpassword } = hp;
       return password;
-    } catch (err) {
-      throw new Error("Error occurred" + err.message);
-    }
-  }
-
-  async checkForManager(email) {
-    try {
-      const existingManager = await db("manager").where("email", email).first();
-      return existingManager;
-    } catch (err) {
-      throw new Error("Error occurred" + err.message);
-    }
-  }
-  async checkForDepartment(department) {
-    try {
-      const existingDepartment = await db("manager")
-        .where("department", department)
-        .first();
-      return existingDepartment;
-    } catch (err) {
-      throw new Error("Error occurred" + err.message);
-    }
-  }
-  async checkForAdmin(adminDepartment) {
-    try {
-      const existingAdmin = await db("manager")
-        .where("department", adminDepartment)
-        .first();
-      return existingAdmin;
-    } catch (err) {
-      throw new Error("Error occurred" + err.message);
-    }
-  }
-  async getDeptName(manager) {
-    try {
-      const managerDept = await db("manager")
-        .select("department")
-        .where("manager_id", manager)
-        .first();
-
-      return managerDept;
     } catch (err) {
       throw new Error("Error occurred" + err.message);
     }
@@ -170,14 +115,14 @@ class UserDAO {
   }
   async updateLastName(newLastName, id) {
     const result = await db("employee")
-      .where("employee_id",id)
+      .where("employee_id", id)
       .update({ last_name: newLastName });
     return result;
   }
   async updateAddress(newAddress, id) {
     const result = await db("employee")
       .where("employee_id", id)
-      .update({ address: newAddress});
+      .update({ address: newAddress });
     return result;
   }
   async updatePhone(newPhone, id) {
@@ -261,52 +206,82 @@ class UserDAO {
     }
   }
 
-  async deleteManagerByIDTransaction(
-    newMID,
-    newDepartment,
-    oldMID,
-  ) {
+  async deleteManagerByIDTransaction(newMID, newDepartment, oldMID) {
     return db.transaction(async (trx) => {
       try {
         await db("employee")
           .transacting(trx)
-          .where('employee_id','=',oldMID)
-          .del()
-        await db("employee").transacting(trx).where('manager_id',oldMID).update({
-          department:newDepartment,
-          manager_id:newMID
-        });
+          .where("employee_id", "=", oldMID)
+          .del();
+        await db("employee")
+          .transacting(trx)
+          .where("manager_id", oldMID)
+          .update({
+            department: newDepartment,
+            manager_id: newMID,
+          });
       } catch (err) {
         await trx.rollback(err);
         throw err;
       }
     });
   }
-async getUsersWithFilter(userFilter){
-  return db('employee')
-  .where((builder) => {
-    Object.entries(userFilter).forEach(([field, filter]) => {
-      switch (filter.operator) {
-        case 'eq':
-          builder.where(field, 'ilike', `${filter.value}`);
-          break;
-        case 'gt':
-          builder.where(field, '>', filter.value);
-          break;
-        case 'sw':
-          builder.where(field, 'ilike', `${filter.value}%`);
-          break;
-      }
-    });
-  })
-  .select('employee_id', 'gender', 'salary', 'department');
-}
+  async getUsersWithFilter(userFilter) {
+    const data = await db("employee")
+      .where((builder) => {
+        Object.entries(userFilter).forEach(([field, filter]) => {
+          switch (filter.operator) {
+            case "eq":
+              if (filter.value == "string") {
+                builder.where(field, "ilike", `${filter.value}`);
+                break;
+              } else {
+                builder.where(field, "=", filter.value);
+              }
+              break;
+
+
+            case "gt":
+              if (filter.value == "string") {
+              } else {
+                builder.where(field, ">", filter.value);
+              }
+              break;
+
+
+            case "sw":
+              if (filter.value == "string") {
+              } else {
+                builder.where(field, "ilike", `${filter.value}%`);
+              }
+              break;
+
+
+            case "cn":
+              builder.where(field, "ilike", `%${filter.value}%`);
+              break;
+
+              
+          }
+        });
+      })
+      .select(
+        "employee_id",
+        "gender",
+        "salary",
+        "department",
+        "join_date",
+        "first_name"
+      );
+    // console.log(data);
+    return data;
+  }
   async getManagerIdFromDept(department) {
     try {
       const manID = await db("employee")
         .select("employee_id")
         .where("department", department)
-        .where("role","=","manager");
+        .where("role", "=", "manager");
 
       return manID;
     } catch (err) {

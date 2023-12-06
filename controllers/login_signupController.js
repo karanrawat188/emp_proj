@@ -84,7 +84,8 @@ async function signup_post(req, res) {
           msg: errorMessages.MAN_ILLEGAL_IP,
         });
       }
-      const userExists = UserService.getManagerFromDept(department);
+      const userExists = await UserService.getManagerFromDept(department);
+      console.log(userExists);
       if (userExists.length > 0) {
         return res.status(400).json({
           validationError: "DEPARTMENT_ALREADY_EXISTS",

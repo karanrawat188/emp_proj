@@ -1,11 +1,8 @@
 const fs = require("fs");
 const path = require("path");
-// const UserService = require("../service/user");
-// const { createToken } = require("./jwtAuth");
 const errorMessages = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../errors.json"), "utf-8")
 );
-
 const db = require("../db/db");
 const UserService = require("../service/user");
 const { performEmployeeValidation } = require("../validation/validation");
@@ -21,45 +18,57 @@ async function bulkUpdateOrInsertEmployees(req, res) {
     }
     const employeeDataArray = req.body; // Assuming an array of employee data
 
-    // Validate input data for each employee
-    const validationErrors = [];
-    for (const employeeData of employeeDataArray) {
-      const validationArr = await performEmployeeValidation(employeeData);
-      if (validationArr.length > 0) {
-        validationErrors.push({
-          employeeData,
-          errors: validationArr,
-        });
-      }
-    }
-    if (validationErrors.length > 0) {
-      return res.status(400).json({
-        err: "Bulk upsert failure",
-        msg: validationErrors,
-      });
-    }
 
     await db.transaction(async (trx) => {
       const results = [];
+      const validationErrors = [];
+
       for (const employeeData of employeeDataArray) {
+        const validationArr = await performEmployeeValidation(employeeData);
+        if (validationArr.length > 0) {
+          validationErrors.push({
+            employeeData,
+            errors: validationArr,
+          });
+          continue;
+        }
+
+
+
+
         if ("id" in employeeData) {
           if ("firstName" in employeeData) {
-            await UserService.updateFirstName(employeeData.firstName, employeeData.id);
+            await UserService.updateFirstName(
+              employeeData.firstName,
+              employeeData.id
+            );
           }
           if ("lastName" in employeeData) {
-            await UserService.updateLastName(employeeData.lastName, employeeData.id);
+            await UserService.updateLastName(
+              employeeData.lastName,
+              employeeData.id
+            );
           }
           if ("phone" in employeeData) {
             await UserService.updatePhone(employeeData.phone, employeeData.id);
           }
           if ("address" in employeeData) {
-            await UserService.updateAddress(employeeData.address, employeeData.id);
+            await UserService.updateAddress(
+              employeeData.address,
+              employeeData.id
+            );
           }
           results.push({
-            id:employeeData.id,
+            id: employeeData.id,
             message: "Employee successfully processed!",
           });
-        } 
+        }
+        
+        
+        
+        
+        
+        
         else {
           const firstName = employeeData.firstName;
           const lastName = employeeData.lastName;
@@ -97,10 +106,13 @@ async function bulkUpdateOrInsertEmployees(req, res) {
           });
         }
       }
+
+
       await trx.commit();
       res.status(201).json({
         msg: "Bulk upsert successfully completed!",
         results,
+        validationErrors,
       });
     });
   } catch (error) {
