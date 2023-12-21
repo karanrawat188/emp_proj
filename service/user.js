@@ -22,7 +22,9 @@ class UserService {
     role,
     phone,
     salary,
-    location
+    location,
+    latitude,
+    longitude
   ) {
     try {
       const passwordStrength = zxcvbn(password);
@@ -48,7 +50,9 @@ class UserService {
         role,
         phone,
         salary,
-        location
+        location,
+        latitude,
+        longitude
       );
     } catch (err) {
       throw new Error("error occured " + err.message);
@@ -275,15 +279,15 @@ class UserService {
         const [operator, value] = params.department.split(':');
         userFilter.department = { operator, value };
       }
-      if (params.employee_id) {
-        const [operator, value] = params.employee_id.split(':');
-        userFilter.employee_id = { operator, value };
+      if (params.id) {
+        const [operator, value] = params.id.split(':');
+        userFilter.id = { operator, value };
       }
       if (params.first_name) {
         const [operator, value] = params.first_name.split(':');
         userFilter.first_name = { operator, value };
       }
-
+      console.log(userFilter)
       return personDAO.getUsersWithFilter(userFilter);
 
 

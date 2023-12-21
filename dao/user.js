@@ -1,6 +1,7 @@
 const db = require("../db/db");
 const user = require("../service/user");
 const { DateTime } = require("luxon");
+const client = require('../es_config');
 
 class UserDAO {
   async createUser(
@@ -36,6 +37,33 @@ class UserDAO {
           location: location,
         })
         .returning("employee_id");
+
+      const indexName = "employee"; 
+      const documentData = {
+        first_name: firstName,
+        email: email,
+        last_name: lastName,
+        gender: gender,
+        manager_id: manager,
+        address: address,
+        password: password,
+        department: department,
+        dob:dob,
+        role: role,
+        phone: phone,
+        salary: salary,
+        location: location,
+        join_date: DateTime.now().toFormat('dd-MM-yyyy'),
+        employe_id:id.employee_id
+      };
+        const response = await client.index({
+          index: indexName,
+          body: documentData,
+          id:id.employee_id,
+        });
+    
+        console.log('Document inserted:', response);
+      
 
       return id;
     } catch (err) {
@@ -227,55 +255,112 @@ class UserDAO {
     });
   }
   async getUsersWithFilter(userFilter) {
-    const data = await db("employee")
-      .where((builder) => {
-        Object.entries(userFilter).forEach(([field, filter]) => {
-          switch (filter.operator) {
-            case "eq":
-              if (filter.value == "string") {
-                builder.where(field, "ilike", `${filter.value}`);
-                break;
-              } else {
-                builder.where(field, "=", filter.value);
-              }
-              break;
+    let reqbody;
+      const body = {
+        query: {
+          bool: {
+            must: [],
+          },
+        },
+        _source: ["first_name", "last_name", "address", "phone", "email", "location","salary"],
+      }
+    
+      Object.entries(userFilter).forEach(([field, filter]) => {
+        switch (filter.operator) {
+          case 'gte':
+            body.query.bool.must.push({
+              range: {
+                [field]: {
+                  gte: filter.value,
+                },
+              },
+            });
+            break;
 
+            case 'lte':
+            body.query.bool.must.push({
+              range: {
+                [field]: {
+                  lte: filter.value,
+                },
+              },
+            });
+            break;
 
-            case "gt":
-              if (filter.value == "string") {
-              } else {
-                builder.where(field, ">", filter.value);
-              }
-              break;
+            case 'cn':
+              body.query.bool.must.push({
+                wildcard:{
+                  [field]:{
+                    value:`*${filter.value}*`,
+                  }
+                }
+              })
+            break;
 
-
-            case "sw":
-              if (filter.value == "string") {
-              } else {
-                builder.where(field, "ilike", `${filter.value}%`);
-              }
-              break;
-
-
-            case "cn":
-              builder.where(field, "ilike", `%${filter.value}%`);
-              break;
-
-              
-          }
+            case 'eq':
+              body.query.bool.must.push({
+                match:{
+                  [field]:filter.value,
+                }
+              })
+              break;              
+        }
+      }); 
+        const ans = await client.search({
+          index: 'employee', 
+          body: body,
         });
-      })
-      .select(
-        "employee_id",
-        "gender",
-        "salary",
-        "department",
-        "join_date",
-        "first_name"
-      );
-    // console.log(data);
-    return data;
-  }
+        console.log('Elasticsearch Response:', ans.hits.hits);
+         // return data.hits.hits.map(hit => hit._source);
+         const res = ans.hits.hits.map((ele)=>{
+        return ele._source
+        })
+        return res
+    
+    // const data = await db("employee")
+    //   .where((builder) => {
+    //     Object.entries(userFilter).forEach(([field, filter]) => {
+    //       switch (filter.operator) {
+    //         case "eq":
+    //           if (filter.value == "string") {
+    //             builder.where(field, "ilike", `${filter.value}`);
+    //             break;
+    //           } else {
+    //             builder.where(field, "=", filter.value);
+    //           }
+    //           break;
+
+    //         case "gt":
+    //           if (filter.value == "string") {
+    //           } else {
+    //             builder.where(field, ">", filter.value);
+    //           }
+    //           break;
+
+    //         case "sw":
+    //           if (filter.value == "string") {
+    //           } else {
+    //             builder.where(field, "ilike", `${filter.value}%`);
+    //           }
+    //           break;
+
+    //         case "cn":
+    //           builder.where(field, "ilike", `%${filter.value}%`);
+    //           break;
+    //       }
+    //     });
+    //   })
+    //   .select(
+    //     "employee_id",
+    //     "gender",
+    //     "salary",
+    //     "department",
+    //     "join_date",
+    //     "first_name"
+    //   );
+    // // console.log(data);
+    // return data;
+}
   async getManagerIdFromDept(department) {
     try {
       const manID = await db("employee")

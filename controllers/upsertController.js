@@ -6,6 +6,7 @@ const errorMessages = JSON.parse(
 const db = require("../db/db");
 const UserService = require("../service/user");
 const { performEmployeeValidation } = require("../validation/validation");
+const client = require('../es_config')
 
 async function bulkUpdateOrInsertEmployees(req, res) {
   try {
@@ -17,7 +18,6 @@ async function bulkUpdateOrInsertEmployees(req, res) {
       });
     }
     const employeeDataArray = req.body; // Assuming an array of employee data
-
 
     await db.transaction(async (trx) => {
       const results = [];
@@ -33,42 +33,57 @@ async function bulkUpdateOrInsertEmployees(req, res) {
           continue;
         }
 
+          if ("id" in employeeData) {
+            console.log(employeeData);
+            const actions = [];
+          
+            if ("firstName" in employeeData) {
+              await UserService.updateFirstName(employeeData.firstName, employeeData.id);
+              actions.push(
+                { update: { _index: "employee", _id: employeeData.id } },
+                { doc: { firstName: employeeData.firstName } }
+              );
+            }
+          
+            if ("lastName" in employeeData) {
+              await UserService.updateLastName(employeeData.lastName, employeeData.id);
 
+              actions.push(
+                { update: { _index: "employee", _id: employeeData.id } },
+                { doc: { lastName: employeeData.lastName } }
+              );
+            }
+          
+            if ("phone" in employeeData) {
+              await UserService.updatePhone(employeeData.phone, employeeData.id);
 
+              actions.push(
+                { update: { _index: "employee", _id: employeeData.id } },
+                { doc: { phone: employeeData.phone } }
+              );
+            }
+          
+            if ("address" in employeeData) {
+              await UserService.updateAddress(employeeData.address, employeeData.id);
 
-        if ("id" in employeeData) {
-          if ("firstName" in employeeData) {
-            await UserService.updateFirstName(
-              employeeData.firstName,
-              employeeData.id
-            );
+              actions.push(
+                { update: { _index: "employee", _id: employeeData.id } },
+                { doc: { address: employeeData.address } }
+              );
+            }
+          
+            results.push({
+              id: employeeData.id,
+              message: "Employee successfully processed!",
+            });
+          
+            console.log(actions);
+          
+            const bulkResponse = await client.bulk({ refresh: true, body: actions });
+            console.log(bulkResponse);
           }
-          if ("lastName" in employeeData) {
-            await UserService.updateLastName(
-              employeeData.lastName,
-              employeeData.id
-            );
-          }
-          if ("phone" in employeeData) {
-            await UserService.updatePhone(employeeData.phone, employeeData.id);
-          }
-          if ("address" in employeeData) {
-            await UserService.updateAddress(
-              employeeData.address,
-              employeeData.id
-            );
-          }
-          results.push({
-            id: employeeData.id,
-            message: "Employee successfully processed!",
-          });
-        }
-        
-        
-        
-        
-        
-        
+
+        //creation
         else {
           const firstName = employeeData.firstName;
           const lastName = employeeData.lastName;
@@ -106,8 +121,6 @@ async function bulkUpdateOrInsertEmployees(req, res) {
           });
         }
       }
-
-
       await trx.commit();
       res.status(201).json({
         msg: "Bulk upsert successfully completed!",

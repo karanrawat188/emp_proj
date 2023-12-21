@@ -51,7 +51,6 @@ async function signup_post(req, res) {
       msg: validationArr,
     });
   }
-
   const isUserEmailUnique = await UserService.isEmailUniquePost(email);
   if (isUserEmailUnique.length > 0) {
     return res.status(404).json({
@@ -108,7 +107,7 @@ async function signup_post(req, res) {
         });
       }
     }
-    const location = `POINT(${longitude} ${latitude})`;
+    const location = `POINT (${longitude} ${latitude})`;
     const id = await UserService.createUser(
       firstName,
       lastName,
@@ -122,7 +121,9 @@ async function signup_post(req, res) {
       role,
       phone,
       salary,
-      location
+      location,
+      latitude,
+      longitude
     );
 
     // jwt signing
