@@ -178,8 +178,11 @@ async function login_post(req, res) {
         error: errorMessages.DOES_NOT_EXIST,
       });
     }
-    const userDetail = await UserService.getUserByEmail(email);
-
+    // fetching directly from DB
+    //const userDetail = await UserService.getUserByEmail(email);
+    
+    //using ELK
+    const userDetail = await UserService.getUserByEmailELK(email);
     //session create yaha hoga
     const data = {
       department: userDetail.department,

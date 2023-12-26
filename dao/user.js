@@ -453,6 +453,27 @@ class UserDAO {
       throw new Error("error occured" + err.message);
     }
   }
+  async getUserByEmailELK(email){
+    try{
+      const data = await client.search({
+        index: "employee",
+        body:{
+          query:{
+            term:{
+              "email":email
+            }
+          },
+          _source:["first_name","last_name","employe_id","email","address","location","role","department","gender","dob","phone","join_date","salary","manager_id"]
+
+        }
+      });
+      console.log(data.hits.hits[0]._source)
+      return data.hits.hits[0]._source;
+    }catch(err){
+      throw new Error("error occured" + err.message)
+    }
+
+  }
 }
 
 module.exports = new UserDAO();

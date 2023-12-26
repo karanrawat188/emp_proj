@@ -330,6 +330,14 @@ class UserService {
       throw new Error("new error occurred" + err.message);
     }
   }
+  async getUserByEmailELK(email){
+   try{
+    const user = await personDAO.getUserByEmailELK(email);
+    return user;
+   }catch(err){
+    throw new Error("new error occurred"+ err.message)
+   }
+  }
 }
 
 module.exports = new UserService();
