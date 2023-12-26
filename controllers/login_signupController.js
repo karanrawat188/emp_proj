@@ -15,6 +15,7 @@ async function signup_post(req, res) {
   const lastName = req.body.lastName;
   const dob = req.body.dob;
   const gender = req.body.gender;
+  const join_date = req.body.join_date;
   const email = req.body.email;
   const department = req.body.department;
   const manager = req.body.manager;
@@ -41,6 +42,7 @@ async function signup_post(req, res) {
     salary,
     latitude,
     longitude,
+    join_date
   });
 
   const validationArr = performValidation(req.body);
@@ -122,8 +124,7 @@ async function signup_post(req, res) {
       phone,
       salary,
       location,
-      latitude,
-      longitude
+      join_date
     );
 
     // jwt signing

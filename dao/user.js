@@ -1,7 +1,7 @@
 const db = require("../db/db");
 const user = require("../service/user");
 const { DateTime } = require("luxon");
-const client = require('../es_config');
+const client = require("../es_config");
 
 class UserDAO {
   async createUser(
@@ -17,7 +17,8 @@ class UserDAO {
     role,
     phone,
     salary,
-    location
+    location,
+    join_date
   ) {
     try {
       const [id] = await db("employee")
@@ -35,10 +36,11 @@ class UserDAO {
           phone: phone,
           salary: salary,
           location: location,
+          join_date: join_date,
         })
         .returning("employee_id");
 
-      const indexName = "employee"; 
+      const indexName = "employee";
       const documentData = {
         first_name: firstName,
         email: email,
@@ -48,22 +50,21 @@ class UserDAO {
         address: address,
         password: password,
         department: department,
-        dob:dob,
+        dob: dob,
         role: role,
         phone: phone,
         salary: salary,
         location: location,
-        join_date: DateTime.now().toFormat('dd-MM-yyyy'),
-        employe_id:id.employee_id
+        join_date: join_date,
+        employe_id: id.employee_id,
       };
-        const response = await client.index({
-          index: indexName,
-          body: documentData,
-          id:id.employee_id,
-        });
-    
-        console.log('Document inserted:', response);
-      
+      const response = await client.index({
+        index: indexName,
+        body: documentData,
+        id: id.employee_id,
+      });
+
+      console.log("Document inserted:", response);
 
       return id;
     } catch (err) {
@@ -255,68 +256,100 @@ class UserDAO {
     });
   }
   async getUsersWithFilter(userFilter) {
-    let reqbody;
-      const body = {
-        query: {
-          bool: {
-            must: [],
-          },
+    const body = {
+      query: {
+        bool: {
+          must: [],
         },
-        _source: ["first_name", "last_name", "address", "phone", "email", "location","salary"],
-      }
-    
-      Object.entries(userFilter).forEach(([field, filter]) => {
-        switch (filter.operator) {
-          case 'gte':
-            body.query.bool.must.push({
-              range: {
-                [field]: {
-                  gte: filter.value,
-                },
+      },
+      _source: [
+        "first_name",
+        "last_name",
+        "address",
+        "phone",
+        "email",
+        "location",
+        "salary",
+        "join_date",
+        "location",
+        "employe_id",
+        "role"
+      ],
+    };
+
+    Object.entries(userFilter).forEach(([field, filter]) => {
+      switch (filter.operator) {
+        case "gte":
+          body.query.bool.must.push({
+            range: {
+              [field]: {
+                gte: filter.value,
               },
-            });
-            break;
+            },
+          });
+          break;
 
-            case 'lte':
-            body.query.bool.must.push({
-              range: {
-                [field]: {
-                  lte: filter.value,
-                },
+        case "lte":
+          body.query.bool.must.push({
+            range: {
+              [field]: {
+                lte: filter.value,
               },
-            });
-            break;
+            },
+          });
+          break;
 
-            case 'cn':
-              body.query.bool.must.push({
-                wildcard:{
-                  [field]:{
-                    value:`*${filter.value}*`,
-                  }
-                }
-              })
-            break;
+        case "cn":
+          body.query.bool.must.push({
+            wildcard: {
+              [field]: {
+                value: `*${filter.value}*`,
+              },
+            },
+          });
+          break;
 
-            case 'eq':
-              body.query.bool.must.push({
-                match:{
-                  [field]:filter.value,
-                }
-              })
-              break;              
-        }
-      }); 
-        const ans = await client.search({
-          index: 'employee', 
-          body: body,
+        case "eq":
+          body.query.bool.must.push({
+            match: {
+              [field]: filter.value,
+            },
+          });
+          break;
+        case "near":
+
+        body.query.bool.must.push({
+          term: {
+            role: "employee",
+          },
+          term:{
+            department:filter.value.dept,
+          }
         });
-        console.log('Elasticsearch Response:', ans.hits.hits);
-         // return data.hits.hits.map(hit => hit._source);
-         const res = ans.hits.hits.map((ele)=>{
-        return ele._source
-        })
-        return res
-    
+
+          body.query.bool.must.push({
+            geo_distance: {
+              distance: `${filter.value.dist}km`,
+              location: {
+                lat: parseFloat(filter.value.latitude),
+                lon: parseFloat(filter.value.longitude),
+              },
+            },
+          });
+          break;
+      }
+    });
+    const ans = await client.search({
+      index: "employee",
+      body: body,
+    });
+    console.log("Elasticsearch Response:", ans.hits.hits);
+    // return data.hits.hits.map(hit => hit._source);
+    const res = ans.hits.hits.map((ele) => {
+      return ele._source;
+    });
+    return res;
+
     // const data = await db("employee")
     //   .where((builder) => {
     //     Object.entries(userFilter).forEach(([field, filter]) => {
@@ -360,7 +393,7 @@ class UserDAO {
     //   );
     // // console.log(data);
     // return data;
-}
+  }
   async getManagerIdFromDept(department) {
     try {
       const manID = await db("employee")

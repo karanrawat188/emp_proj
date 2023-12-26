@@ -44,7 +44,7 @@ function performValidation(inputs) {
 
   if (
     !("dob" in inputs) ||
-    !DateTime.fromFormat(inputs.dob, "MM-dd-yyyy").isValid
+    !DateTime.fromFormat(inputs.dob, "yyyy-MM-dd").isValid
   ) {
     err.push({
       validationError: "INVALID_DATE",
@@ -73,7 +73,7 @@ function performValidation(inputs) {
 
   if (
     !("join_date" in inputs) ||
-    !DateTime.fromFormat(inputs.join_date, "MM-dd-yyyy").isValid
+    !DateTime.fromFormat(inputs.join_date, "yyyy-MM-dd").isValid
   ) {
     err.push({
       validationError: "INVALID_DOJ",
@@ -294,7 +294,7 @@ async function performEmployeeValidation(inputs) {
 
     if (
       !("dob" in inputs) ||
-      !DateTime.fromFormat(inputs.dob, "MM-dd-yyyy").isValid
+      !DateTime.fromFormat(inputs.dob, "yyyy-MM-dd").isValid
     ) {
       err.push({
         validationError: "INVALID_DATE",
@@ -323,7 +323,7 @@ async function performEmployeeValidation(inputs) {
 
     if (
       !("join_date" in inputs) ||
-      !DateTime.fromFormat(inputs.join_date, "MM-dd-yyyy").isValid
+      !DateTime.fromFormat(inputs.join_date, "yyyy-MM-dd").isValid
     ) {
       err.push({
         validationError: "INVALID_DOJ",

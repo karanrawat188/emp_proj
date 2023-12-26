@@ -3,7 +3,7 @@ const router = express.Router();
 const queryParamsController = require('../controllers/queryParamsController')
 const { requireAuth } = require('../middleware/authMiddleware');
 
-router.get('/',requireAuth,queryParamsController.queryRoutes);
+router.get('/',queryParamsController.queryRoutes);
 
 
 module.exports = router;

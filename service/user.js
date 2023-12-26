@@ -4,6 +4,8 @@ const zxcvbn = require("zxcvbn");
 const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcrypt");
+const client = require("../es_config");
+const user = require("../dao/user");
 const errorMessages = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../errors.json"), "utf-8")
 );
@@ -23,14 +25,13 @@ class UserService {
     phone,
     salary,
     location,
-    latitude,
-    longitude
+    join_date
   ) {
     try {
       const passwordStrength = zxcvbn(password);
       if (passwordStrength.score < 2) {
         const error = new Error(errorMessages.WEAK_PASSWORD);
-        error.statusCode = 400; 
+        error.statusCode = 400;
         throw error;
       }
 
@@ -51,8 +52,7 @@ class UserService {
         phone,
         salary,
         location,
-        latitude,
-        longitude
+        join_date
       );
     } catch (err) {
       throw new Error("error occured " + err.message);
@@ -150,24 +150,21 @@ class UserService {
       throw new Error("error occurred " + err.message);
     }
   }
-  async getManager(id,department){
-    try{
-      const users = await personDAO.getManager(id,department);
-      return users
-    }catch(err){
-      throw new Error("error occurred"+err.message);
+  async getManager(id, department) {
+    try {
+      const users = await personDAO.getManager(id, department);
+      return users;
+    } catch (err) {
+      throw new Error("error occurred" + err.message);
     }
-
-
   }
   async getManagerFromDept(department) {
-    try{
+    try {
       const user = await personDAO.getManagerFromDept(department);
       return user;
-    }catch(err){
-      throw new Error("error occurred " + err.message); 
+    } catch (err) {
+      throw new Error("error occurred " + err.message);
     }
-
   }
   async getManagerName(managerId) {
     try {
@@ -182,7 +179,7 @@ class UserService {
       throw new Error("error occurred " + err.message);
     }
   }
-  async updateFirstName(newFirstName,id) {
+  async updateFirstName(newFirstName, id) {
     const fname = await personDAO.updateFirstName(newFirstName, id);
     //yaha par error handle ho sakta hai if newFname=Fname
     return fname;
@@ -238,14 +235,9 @@ class UserService {
       throw new Error("new error occurred " + err.message);
     }
   }
-  async deleteManagerByID(
-    newMID,
-    newDepartment,
-    oldMID,
-  ) {
+  async deleteManagerByID(newMID, newDepartment, oldMID) {
     try {
       await personDAO.deleteManagerByIDTransaction(
-  
         newMID,
         newDepartment,
         oldMID
@@ -262,37 +254,56 @@ class UserService {
       throw new Error("new Erorr occurred" + err.message);
     }
   }
-  async getUsers(params){
-    try{
-
+  async getUsers(params) {
+    try {
       const userFilter = {}; // Construct filter based on queryParams
-      
+
       if (params.gender) {
-        const [operator, value] = params.gender.split(':');
+        const [operator, value] = params.gender.split(":");
         userFilter.gender = { operator, value };
       }
       if (params.salary) {
-        const [operator, value] = params.salary.split(':');
+        const [operator, value] = params.salary.split(":");
         userFilter.salary = { operator, value };
       }
       if (params.department) {
-        const [operator, value] = params.department.split(':');
+        const [operator, value] = params.department.split(":");
         userFilter.department = { operator, value };
       }
-      if (params.id) {
-        const [operator, value] = params.id.split(':');
-        userFilter.id = { operator, value };
+      if (params.employe_id) {
+        const [operator, value] = params.employe_id.split(":");
+        userFilter.employe_id = { operator, value };
       }
       if (params.first_name) {
-        const [operator, value] = params.first_name.split(':');
+        const [operator, value] = params.first_name.split(":");
         userFilter.first_name = { operator, value };
+      }
+      if (params.join_date) {
+        const [operator, value] = params.join_date.split(":");
+        userFilter.join_date = { operator, value };
+      }
+      if (params.id) {
+        const data = await client.get({
+          index: "employee",
+          id: params.id,
+        });
+        const obj = data._source;
+        if (obj.role !== "manager") {
+          throw new Error(" User is not allowed to perform this access");
+        }
+        console.log(obj)
+        const match = obj.location.match(/\(([^ ]+) ([^)]+)\)/);
+        const longitude = parseFloat(match[1]);
+        const latitude = parseFloat(match[2]);
+        const dist = 100;
+        const dept =obj.department;
+        const pobj = { latitude, longitude, dist,dept};
+        userFilter.location = { operator: "near", value: pobj };
       }
       console.log(userFilter)
       return personDAO.getUsersWithFilter(userFilter);
-
-
-    }catch(err){
-      throw new Error('new error occurred'+err.message);
+    } catch (err) {
+      throw new Error("new error occurred" + err.message);
     }
   }
   async fetchpassword(email) {

@@ -4,6 +4,7 @@ const errorMessages = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../errors.json"), "utf-8")
 );
 const UserService = require("../service/user");
+const client = require("../es_config");
 
 //deletion
 async function deleteEmployee(req, res) {
@@ -24,20 +25,27 @@ async function deleteEmployee(req, res) {
         msg: errorMessages.ID_NOT_ENTERED,
       });
     }
-   
+
     console.log(toBeDeleted); // ye check karna hai kii array return karna hai ya object !!!
     const toBeDeletedRole = toBeDeleted[0].role;
-    console.log(userRole)
+    console.log(userRole);
     if (
       toBeDeletedRole === "employee" &&
       (userRole === "manager" || userRole === "admin")
     ) {
       const arr = [userRole, req.user.email];
-      await UserService.deleteUserByID(eid);
 
+      await UserService.deleteUserByID(eid);
+      const response = await client.delete({
+        index: "employee",
+        id: eid,
+      });
+      console.log(response);
       await UserService.storeLog(toBeDeleted[0], arr);
+
       return res.status(201).json({
         msg: `User successfully deleted of employee id ${toBeDeleted[0]}`,
+        msg: `user successfully deleted from kibana ${response}`,
       });
     } else {
       return res.status(401).json({
@@ -57,32 +65,38 @@ async function deletedLogs(req, res) {
 
 async function deleteManager(req, res) {
   try {
-    if ( 
-       // fetch id , old Dept , new Dept from req.body
+    if (
+      // fetch id , old Dept , new Dept from req.body
 
       !req.body.id ||
       typeof req.body.id !== "number" ||
       !req.body.newAssignedDepartment ||
-      typeof req.body.newAssignedDepartment !== "string"||
-      !req.body.delDept||
-      typeof req.body.delDept !=="string"
+      typeof req.body.newAssignedDepartment !== "string" ||
+      !req.body.delDept ||
+      typeof req.body.delDept !== "string"
     ) {
       return res.status(404).json({
-        validationError:"INVALID_INPUT",
-        msg:errorMessages.INVALID_INPUT
+        validationError: "INVALID_INPUT",
+        msg: errorMessages.INVALID_INPUT,
       });
     }
 
     const isAdmin = req.user.role;
-    const managerData = await UserService.getManager(req.body.id,req.body.delDept);
-    if(managerData.length === 0){
-      return res.status(404).json({
-        validationError:"INVALID_INPUT",
-        msg:errorMessages.INVALID_INPUT
-      })
-    }     
+    const managerData = await UserService.getManager(
+      req.body.id,
+      req.body.delDept
+    );
     console.log(managerData);
-    if (isAdmin === "admin"){
+    if (managerData.length === 0) {
+      return res.status(404).json({
+        validationError: "INVALID_INPUT",
+        msg: errorMessages.INVALID_INPUT,
+      });
+    }
+
+
+    //checking authorization and validity
+    if (isAdmin === "admin") {
       const newDepartment = req.body.newAssignedDepartment;
       if (
         newDepartment !== "IT" &&
@@ -91,30 +105,55 @@ async function deleteManager(req, res) {
         newDepartment !== "Marketing" &&
         newDepartment !== "Finance" &&
         newDepartment !== "HR" &&
-        newDepartment !== "Others"
+        newDepartment !== "Others"&&
+        newDepartment!=="Finance"
       ) {
-        console.log(newDepartment) 
+        console.log(newDepartment);
         return res.status(400).json({
           validationError: "INVALID_DEPARTMENT",
           msg: errorMessages.INVALID_DEPARTMENT,
         });
       }
 
-      const newManagerID =await UserService.getManagerIdFromDept(newDepartment); // new department should exists and be assigned
-      if(newManagerID.length===0){
+      const newManagerID = await UserService.getManagerIdFromDept(
+        newDepartment
+      ); // new department should exists and be assigned
+      if (newManagerID.length === 0) {
         return res.status(404).json({
-            validationError:"DEPARTMENT_NOT_ASSIGNED",
-            msg:errorMessages.DEPARTMENT_NOT_ASSIGNED
-        })
+          validationError: "DEPARTMENT_NOT_ASSIGNED",
+          msg: errorMessages.DEPARTMENT_NOT_ASSIGNED,
+        });
       }
       const arr = [isAdmin, req.user.email];
       await UserService.deleteManagerByID(
         newManagerID[0].employee_id,
         newDepartment,
-        managerData[0].employee_id,
+        managerData[0].employee_id
       );
-      
-      await UserService.storeLog(managerData[0],arr);
+
+      await UserService.storeLog(managerData[0], arr);
+      const data = await client.delete({
+        index: "employee",
+        id: req.body.id,
+      });
+      console.log("deleted from ELK", data);
+
+      const upd = await client.updateByQuery({
+        index: "employee",
+        body: {
+          query: {
+            match: { manager_id: req.body.id },
+          },
+          script: {
+            source: "ctx._source.manager_id = params.nmid ; ctx._source.department = params.dpt",
+            params: {
+              nmid: newManagerID[0].employee_id,
+              dpt: newDepartment,
+            },
+          },
+        },
+      });
+      console.log("updated from ELK", upd);
       return res.status(201).json({
         msg: `User successfully deleted of employee id ${managerData[0]}`,
       });

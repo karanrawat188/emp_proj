@@ -34,6 +34,5 @@
   "INVALID_SALARY": "salary entered is either not entered or not valid",
   "MANAGER_ALREADY_EXISTS": "manager already assigned",
   "INVALID_MANAGER_ID":"please enter correct manager id",
-  "N":"payload is empty",
   "DEPARTMENT_NOT_ASSIGNED":"department is not yet fulfilled"
 }

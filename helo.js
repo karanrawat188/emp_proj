@@ -1,25 +1,38 @@
-const ESbulk=[]
+const fs = require("fs");
+const path = require("path");
+const client = require('./es_config');
 
+async function updateFoodField() {
+    try {
+        // const  body  = await client.updateByQuery({
+        //     index: "student",
+        //     body: {
+        //         query: {
+        //             exists: { field: "food" }
+        //         },
+        //         script: {
+        //             source: 'ctx._source.food = params.newfood',
+        //             params: {
+        //                 newfood: "zeher"
+        //             }
+        //         }
+        //     }
+        // });
+        const  body  = await client.deleteByQuery({
+            index: "student",
+            body: {
+                query: {
+                    exists: { field: "food" }
+                }
+            }
+        });
 
-ESbulk.push(
-    {update:{_index: "employees", _id:434}},
-    {doc:{firstName: "karan"}}
-  )    
-          ESbulk.push(
-    {update:{_index: "employees", _id:5}},
-    {doc:{firstName:"karan"}}
-  )
-              ESbulk.push(
-    {update:{_index: "employees", _id:7}},
-    {doc:{firstName:"karan"}}
-  ) 
-             ESbulk.push(
-    {update:{_index: "employees", _id:765}},
-    {doc:{firstName: "karan"}}
-  )
-              ESbulk.push(
-    {update:{_index: "employees", _id:567}},
-    {doc:{firstName: "karan"}}
-  )
+        console.log('Documents updated:', body);
+        return body;
+    } catch (error) {
+        console.error('Error updating documents:', error.message);
+        throw error;
+    }
+}
 
-  console.log(ESbulk)
+updateFoodField();

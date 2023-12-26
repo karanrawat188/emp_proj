@@ -98,6 +98,7 @@ async function bulkUpdateOrInsertEmployees(req, res) {
           const phone = employeeData.phone;
           const salary = employeeData.salary;
           const latitude = employeeData.latitude;
+          const join_date = employeeData.join_date;
           const longitude = employeeData.longitude;
           const location = `POINT(${longitude} ${latitude})`;
           const id = await UserService.createUser(
@@ -113,7 +114,8 @@ async function bulkUpdateOrInsertEmployees(req, res) {
             role,
             phone,
             salary,
-            location
+            location,
+            join_date
           );
           results.push({
             id,
