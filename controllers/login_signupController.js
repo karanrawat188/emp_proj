@@ -1,10 +1,10 @@
+const rclient = require("../redis-client");
 const UserService = require("../service/user");
 const { createToken } = require("./jwtAuth");
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const { performValidation } = require("../validation/validation");
-const { error } = require("console");
 const errorMessages = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../errors.json"), "utf-8")
 );
@@ -42,7 +42,7 @@ async function signup_post(req, res) {
     salary,
     latitude,
     longitude,
-    join_date
+    join_date,
   });
 
   const validationArr = performValidation(req.body);
@@ -105,7 +105,7 @@ async function signup_post(req, res) {
       if (getManager.length === 0) {
         return res.status(400).json({
           validationError: "INVALID_MANAGER_ID",
-          msg: errorMessages.INVALID_MANAGER_ID
+          msg: errorMessages.INVALID_MANAGER_ID,
         });
       }
     }
@@ -128,7 +128,6 @@ async function signup_post(req, res) {
     );
 
     // jwt signing
-
     const data = {
       department: department,
       email: email,
@@ -136,6 +135,14 @@ async function signup_post(req, res) {
       id: id,
     };
     const token = createToken(data, maxAge);
+
+
+    //cache mai bhi store karna hai
+    const key = `user:${email}`;
+    const fetchAllData = await UserService.fetchDataFromELK(email);
+    await rclient.set(key, JSON.stringify(fetchAllData));
+    await rclient.expire(key,24*60*60);
+
 
     res.status(201).json({
       msg: "user successfully created!",
@@ -149,6 +156,7 @@ async function signup_post(req, res) {
     });
   }
 }
+
 async function login_post(req, res) {
   if (
     !req.body.email ||
@@ -163,39 +171,85 @@ async function login_post(req, res) {
 
   const { email, password } = req.body;
   try {
-    const user = await UserService.isEmailUnique(email);
-    if (!user) {
-      return res.status(404).json({
-        validationError: "INVALID_INPUT",
-        msg: errorMessages.INVALID_INPUT,
-      });
-    }
-    const gethp = await UserService.fetchpassword(email);
-    const result = await UserService.bcryptCompare(password, gethp);
-    if (!result) {
-      return res.status(400).json({
-        validationError: "DOES_NOT_EXIST",
-        error: errorMessages.DOES_NOT_EXIST,
-      });
-    }
-    // fetching directly from DB
-    //const userDetail = await UserService.getUserByEmail(email);
-    
-    //using ELK
-    const userDetail = await UserService.getUserByEmailELK(email);
-    //session create yaha hoga
-    const data = {
-      department: userDetail.department,
-      email: userDetail.email,
-      role: userDetail.role,
-      id: userDetail.employee_id,
-    };
-    console.log(data);
-    const token = createToken(data, maxAge);
-    return res.status(200).json({
-      token,
-      userDetail,
+    const key = `user:${email}`;
+    const details = await rclient.get(key, (err, result) => {
+      if (err) {
+        throw new Error("error fetching from redis");
+      } else {
+        return result;
+      }
     });
+    if (details) {
+       // DETAILS WILL BE THROWN FROM CACHE
+      console.log("returning result from cache")
+      const userDetail = JSON.parse(details);
+      const gethp = userDetail.password;
+      const result = await UserService.bcryptCompare(password, gethp);
+      if (!result) {
+        return res.status(400).json({
+          validationError: "DOES_NOT_EXIST",
+          error: errorMessages.DOES_NOT_EXIST,
+        });
+      }
+      delete userDetail.password;
+      console.log(userDetail)
+
+      const data = {
+        department: userDetail.department,
+        email: userDetail.email,
+        role: userDetail.role,
+        id: userDetail.employe_id,
+      };
+      const token = createToken(data, maxAge);
+      return res.status(200).json({
+        token,
+        userDetail,
+      });
+    }
+    // agar cache mai nahi pada hoga
+    else {
+      console.log("returning data from ELK")
+      // const user = await UserService.isEmailUnique(email);
+      const user = await UserService.isEmailUniqueELK(email);
+      if (!user) {
+        return res.status(404).json({
+          validationError: "INVALID_INPUT",
+          msg: errorMessages.INVALID_INPUT,
+        });
+      }
+
+      //const gethp = await UserService.fetchpassword(email);
+      const gethp = await UserService.fetchpasswordELK(email);
+      const result = await UserService.bcryptCompare(password, gethp);
+      if (!result) {
+        return res.status(400).json({
+          validationError: "DOES_NOT_EXIST",
+          error: errorMessages.DOES_NOT_EXIST,
+        });
+      }
+      // fetching directly from DB
+      //const userDetail = await UserService.getUserByEmail(email);
+      //using ELK
+      const userDetail = await UserService.getUserByEmailELK(email);
+      console.log(userDetail);
+      //session create yaha hoga
+      const data = {
+        department: userDetail.department,
+        email: userDetail.email,
+        role: userDetail.role,
+        id: userDetail.employe_id,
+      };
+      const token = createToken(data, maxAge);
+      //cache mai bhi store karna hai
+      const key = `user:${email}`;
+      const fetchAllData = await UserService.fetchDataFromELK(email);
+      await rclient.set(key, JSON.stringify(fetchAllData));
+      await rclient.expire(key, 24 * 60 * 60);
+      return res.status(200).json({
+        token,
+        userDetail,
+      });
+    }
   } catch (error) {
     console.log(error);
     return res.status(error.statusCode).json({

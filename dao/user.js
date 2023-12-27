@@ -273,7 +273,7 @@ class UserDAO {
         "join_date",
         "location",
         "employe_id",
-        "role"
+        "role",
       ],
     };
 
@@ -317,15 +317,14 @@ class UserDAO {
           });
           break;
         case "near":
-
-        body.query.bool.must.push({
-          term: {
-            role: "employee",
-          },
-          term:{
-            department:filter.value.dept,
-          }
-        });
+          body.query.bool.must.push({
+            term: {
+              role: "employee",
+            },
+            term: {
+              department: filter.value.dept,
+            },
+          });
 
           body.query.bool.must.push({
             geo_distance: {
@@ -453,26 +452,91 @@ class UserDAO {
       throw new Error("error occured" + err.message);
     }
   }
-  async getUserByEmailELK(email){
-    try{
+  async getUserByEmailELK(email) {
+    try {
       const data = await client.search({
         index: "employee",
-        body:{
-          query:{
-            term:{
-              "email":email
-            }
+        body: {
+          query: {
+            term: {
+              email: email,
+            },
           },
-          _source:["first_name","last_name","employe_id","email","address","location","role","department","gender","dob","phone","join_date","salary","manager_id"]
-
-        }
+          _source: [
+            "first_name",
+            "last_name",
+            "employe_id",
+            "email",
+            "address",
+            "location",
+            "role",
+            "department",
+            "gender",
+            "dob",
+            "phone",
+            "join_date",
+            "salary",
+            "manager_id",
+          ],
+        },
       });
-      console.log(data.hits.hits[0]._source)
       return data.hits.hits[0]._source;
-    }catch(err){
-      throw new Error("error occured" + err.message)
+    } catch (err) {
+      throw new Error("error occured" + err.message);
     }
-
+  }
+  async isEmailUniqueELK(email) {
+    try {
+      const data = await client.search({
+        index: "employee",
+        body: {
+          query: {
+            term: {
+              email: email,
+            },
+          },
+          _source: ["first_name"],
+        },
+      });
+      return data.hits.hits[0];
+    } catch (err) {
+      throw new Error("error occured" + err.message);
+    }
+  }
+  async fetchpasswordELK(email) {
+    try {
+      const data = await client.search({
+        index: "employee",
+        body: {
+          query: {
+            term: {
+              email: email,
+            },
+          },
+          _source: ["password"],
+        },
+      });
+      return data.hits.hits[0]._source.password;
+    } catch (err) {
+      throw new Error("error occured" + err.message);
+    }
+  }
+  async fetchDataFromELK(email){
+    try {
+      const data = await client.search({
+        index: "employee",
+        body: {
+          query: {
+            term: {
+              email: email,
+            },
+          }
+        },
+      });
+      return data.hits.hits[0]._source;
+    } catch (err) {
+      throw new Error("error occured" + err.message);
+    }
   }
 }
 

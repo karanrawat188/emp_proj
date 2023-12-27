@@ -1,38 +1,40 @@
-const fs = require("fs");
-const path = require("path");
-const client = require('./es_config');
+const client = require("./redis-client");
 
-async function updateFoodField() {
-    try {
-        // const  body  = await client.updateByQuery({
-        //     index: "student",
-        //     body: {
-        //         query: {
-        //             exists: { field: "food" }
-        //         },
-        //         script: {
-        //             source: 'ctx._source.food = params.newfood',
-        //             params: {
-        //                 newfood: "zeher"
-        //             }
-        //         }
-        //     }
-        // });
-        const  body  = await client.deleteByQuery({
-            index: "student",
-            body: {
-                query: {
-                    exists: { field: "food" }
-                }
-            }
-        });
+async function init() {
+  let obj = {
+    name: "karan singh",
+    gender: "male",
+    company: "invansys",
+    phone: 9978999999,
+    location: `POINT(12.3892423,24.234)`,
+    email: "kannuurawat18@gmail.com",
+  };
+    const key = `user:kannuurawat1f3@gmail.com`;
+    //const val = await client.expire(hashkey,10);
+    // console.log(val);
+//    const res =  await client.set(key,JSON.stringify(obj));
+const resobj = await client.get(key,(err,res)=>{
+    if(err){
 
-        console.log('Documents updated:', body);
-        return body;
-    } catch (error) {
-        console.error('Error updating documents:', error.message);
-        throw error;
+    }else{
+        return res;
     }
-}
+})
+const res = JSON.parse(resobj);
+   console.log(res)
 
-updateFoodField();
+    // const sobj = await client.get(hashkey, specificField, (err,result)=>{
+    //  if(err){
+    //   console.log('error occurred')
+    //  }else{
+    //   return result
+    //  }
+    // });
+    // const res = JSON.parse(sobj)
+    // if(!res){
+    //   console.log('nothing to compute')
+    //   return
+    // }
+    // console.log(res)
+}
+init();

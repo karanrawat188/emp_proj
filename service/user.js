@@ -37,7 +37,6 @@ class UserService {
 
       // hashing the password
       const hashedpass = await hashPassword(password);
-
       return personDAO.createUser(
         firstName,
         lastName,
@@ -337,6 +336,30 @@ class UserService {
    }catch(err){
     throw new Error("new error occurred"+ err.message)
    }
+  }
+  async isEmailUniqueELK(email){
+    try{
+      const user = await personDAO.isEmailUniqueELK(email);
+      return user;
+     }catch(err){
+      throw new Error("new error occurred"+ err.message)
+     }
+  }
+  async fetchpasswordELK(email){
+    try{
+      const user = await personDAO.fetchpasswordELK(email);
+      return user;
+     }catch(err){
+      throw new Error("new error occurred"+ err.message)
+     } 
+  }
+  async fetchDataFromELK(email){
+    try{
+      const user = await personDAO.fetchDataFromELK(email);
+      return user;
+     }catch(err){
+      throw new Error("new error occurred"+ err.message)
+     } 
   }
 }
 
