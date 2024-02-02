@@ -187,26 +187,6 @@ function performValidation(inputs) {
   }
   return err;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 async function performEmployeeValidation(inputs) {
   let err = [];
   if ("id" in inputs) {

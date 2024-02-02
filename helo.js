@@ -1,40 +1,93 @@
-const client = require("./redis-client");
+async function createUser(
+  firstName,
+  lastName,
+  dob,
+  gender,
+  email,
+  department,
+  manager,
+  address,
+  password,
+  role,
+  phone,
+  salary,
+  location,
+  join_date
+) {
+  try {
+      // Retry logic for database operation
+      const [id] = await retry(() =>
+          db("employee")
+              .insert({
+                  first_name: firstName,
+                  email: email,
+                  last_name: lastName,
+                  gender: gender,
+                  manager_id: manager,
+                  address: address,
+                  password: password,
+                  department: department,
+                  dob: dob,
+                  role: role,
+                  phone: phone,
+                  salary: salary,
+                  location: location,
+                  join_date: join_date,
+              })
+              .returning("employee_id")
+      );
 
-async function init() {
-  let obj = {
-    name: "karan singh",
-    gender: "male",
-    company: "invansys",
-    phone: 9978999999,
-    location: `POINT(12.3892423,24.234)`,
-    email: "kannuurawat18@gmail.com",
-  };
-    const key = `user:kannuurawat1f3@gmail.com`;
-    //const val = await client.expire(hashkey,10);
-    // console.log(val);
-//    const res =  await client.set(key,JSON.stringify(obj));
-const resobj = await client.get(key,(err,res)=>{
-    if(err){
+      const indexName = "employee";
+      const documentData = {
+          first_name: firstName,
+          email: email,
+          last_name: lastName,
+          gender: gender,
+          manager_id: manager,
+          address: address,
+          password: password,
+          department: department,
+          dob: dob,
+          role: role,
+          phone: phone,
+          salary: salary,
+          location: location,
+          join_date: join_date,
+          employe_id: id.employee_id,
+      };
 
-    }else{
-        return res;
-    }
-})
-const res = JSON.parse(resobj);
-   console.log(res)
+      // Retry logic for Elasticsearch
+      await retry(() => client.index({
+          index: indexName,
+          body: documentData,
+          id: id.employee_id,
+      }));
 
-    // const sobj = await client.get(hashkey, specificField, (err,result)=>{
-    //  if(err){
-    //   console.log('error occurred')
-    //  }else{
-    //   return result
-    //  }
-    // });
-    // const res = JSON.parse(sobj)
-    // if(!res){
-    //   console.log('nothing to compute')
-    //   return
-    // }
-    // console.log(res)
+      // Retry logic for Redis
+      const key = `user:${email}`;
+      await retry(() => rclient.set(key, JSON.stringify(documentData)));
+      await retry(() => rclient.expire(key, 24 * 60 * 60));
+
+      console.log("Document inserted:", documentData);
+      console.log("Saved in cache...");
+
+      return id;
+  } catch (err) {
+      console.error("Error occurred:", err.message);
+      throw new Error("Failed to create user. Check logs for details.");
+  }
 }
-init();
+
+// Retry function with exponential backoff
+async function retry(operation, maxRetries = 3, retryDelay = 1000) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+          return await operation();
+      } catch (error) {
+          console.error(`Error: ${error.message}`);
+          console.log(`Retrying in ${retryDelay / 1000} seconds...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+  }
+  throw new Error("Max retries reached. Operation failed.");
+}

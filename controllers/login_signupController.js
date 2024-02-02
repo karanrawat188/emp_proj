@@ -46,7 +46,7 @@ async function signup_post(req, res) {
   });
 
   const validationArr = performValidation(req.body);
-  console.log(validationArr);
+
   if (validationArr.length > 0) {
     return res.status(400).json({
       err: "signup failure",
@@ -86,7 +86,7 @@ async function signup_post(req, res) {
         });
       }
       const userExists = await UserService.getManagerFromDept(department);
-      console.log(userExists);
+  
       if (userExists.length > 0) {
         return res.status(400).json({
           validationError: "DEPARTMENT_ALREADY_EXISTS",
@@ -136,14 +136,6 @@ async function signup_post(req, res) {
     };
     const token = createToken(data, maxAge);
 
-
-    //cache mai bhi store karna hai
-    const key = `user:${email}`;
-    const fetchAllData = await UserService.fetchDataFromELK(email);
-    await rclient.set(key, JSON.stringify(fetchAllData));
-    await rclient.expire(key,24*60*60);
-
-
     res.status(201).json({
       msg: "user successfully created!",
       jwttoken: token,
@@ -192,8 +184,6 @@ async function login_post(req, res) {
         });
       }
       delete userDetail.password;
-      console.log(userDetail)
-
       const data = {
         department: userDetail.department,
         email: userDetail.email,
@@ -201,6 +191,7 @@ async function login_post(req, res) {
         id: userDetail.employe_id,
       };
       const token = createToken(data, maxAge);
+      console.log(userDetail)
       return res.status(200).json({
         token,
         userDetail,
@@ -231,7 +222,6 @@ async function login_post(req, res) {
       //const userDetail = await UserService.getUserByEmail(email);
       //using ELK
       const userDetail = await UserService.getUserByEmailELK(email);
-      console.log(userDetail);
       //session create yaha hoga
       const data = {
         department: userDetail.department,
@@ -245,27 +235,28 @@ async function login_post(req, res) {
       const fetchAllData = await UserService.fetchDataFromELK(email);
       await rclient.set(key, JSON.stringify(fetchAllData));
       await rclient.expire(key, 24 * 60 * 60);
+      delete fetchAllData.password
+      console.log(fetchAllData)
       return res.status(200).json({
         token,
         userDetail,
       });
     }
   } catch (error) {
-    console.log(error);
     return res.status(error.statusCode).json({
       error: error.message,
     });
   }
 }
 
-async function employeeDetails(req, res) {
-  const users = await UserService.getAllUsers();
-  console.log(users);
-  return res.status(200).json(users);
+async function deletedLogs(req, res) {
+  const data = await UserService.getDeletedLogs();
+  console.log(data)
+  return res.status(201).json(data);
 }
 
 module.exports = {
   login_post,
   signup_post,
-  employeeDetails,
+  deletedLogs,
 };

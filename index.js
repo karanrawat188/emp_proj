@@ -14,24 +14,21 @@ app.use(authRoutes);
 app.use("/update", updateRoutes);
 app.use("/filter", queryParamsRoutes);
 app.use("/delete", deleteRoutes);
-
 app.get("/", async (req, res) => {
   const data = await client.search({
-    index: "student",
+    index: "employee",
     query: {
       match_all: {},
     },
   });
   const result = data.hits.hits;
   let arr = result.map((ele)=>{
-    return ele._source.name
+    delete ele._source.password
+    return ele._source
   })
-  console.log(arr)
-
- 
-
+  console.log('output is',arr)
   return res.json({
-    msg: result
+    msg: arr
   });
 });
 app.listen(process.env.PORT, () => {

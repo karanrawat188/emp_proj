@@ -2,7 +2,7 @@ const db = require("../db/db");
 const user = require("../service/user");
 const { DateTime } = require("luxon");
 const client = require("../es_config");
-
+const rclient = require("../redis-client");
 class UserDAO {
   async createUser(
     firstName,
@@ -65,6 +65,12 @@ class UserDAO {
       });
 
       console.log("Document inserted:", response);
+
+      const key = `user:${email}`;
+      await rclient.set(key, JSON.stringify(documentData));
+      await rclient.expire(key,24*60*60);
+
+      console.log("Saved in cache......")
 
       return id;
     } catch (err) {
@@ -274,6 +280,8 @@ class UserDAO {
         "location",
         "employe_id",
         "role",
+        "department",
+        "gender",
       ],
     };
 
@@ -408,6 +416,7 @@ class UserDAO {
   async getDeletedLogs() {
     try {
       const data = await db("log").select("*");
+      console.log(data)
       return data;
     } catch (err) {
       throw new Error("error occurred " + err.message);
@@ -533,6 +542,7 @@ class UserDAO {
           }
         },
       });
+      console.log(data)
       return data.hits.hits[0]._source;
     } catch (err) {
       throw new Error("error occured" + err.message);

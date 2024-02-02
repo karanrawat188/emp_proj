@@ -25,10 +25,8 @@ async function deleteEmployee(req, res) {
         msg: errorMessages.ID_NOT_ENTERED,
       });
     }
-
     console.log(toBeDeleted); // ye check karna hai kii array return karna hai ya object !!!
     const toBeDeletedRole = toBeDeleted[0].role;
-    console.log(userRole);
     if (
       toBeDeletedRole === "employee" &&
       (userRole === "manager" || userRole === "admin")
@@ -36,16 +34,14 @@ async function deleteEmployee(req, res) {
       const arr = [userRole, req.user.email];
 
       await UserService.deleteUserByID(eid);
-      const response = await client.delete({
+      await client.delete({
         index: "employee",
         id: eid,
       });
-      console.log(response);
       await UserService.storeLog(toBeDeleted[0], arr);
 
       return res.status(201).json({
-        msg: `User successfully deleted of employee id ${toBeDeleted[0]}`,
-        msg: `user successfully deleted from kibana ${response}`,
+        msg: `User successfully deleted`,
       });
     } else {
       return res.status(401).json({
@@ -58,10 +54,7 @@ async function deleteEmployee(req, res) {
   }
 }
 
-async function deletedLogs(req, res) {
-  const data = await UserService.getDeletedLogs();
-  return res.status(201).json(data);
-}
+
 
 async function deleteManager(req, res) {
   try {
@@ -155,7 +148,7 @@ async function deleteManager(req, res) {
       });
       console.log("updated from ELK", upd);
       return res.status(201).json({
-        msg: `User successfully deleted of employee id ${managerData[0]}`,
+        msg: `Manager successfully deleted `,
       });
     } else {
       return res.status(401).json({
@@ -169,6 +162,5 @@ async function deleteManager(req, res) {
 }
 module.exports = {
   deleteEmployee,
-  deletedLogs,
   deleteManager,
 };
